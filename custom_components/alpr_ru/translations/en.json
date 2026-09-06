@@ -14,7 +14,7 @@
     },
     "error": {
       "invalid_auth": "Invalid API key",
-      "cannot_connect": "Unable to connect to ALPR-RU",
+      "cannot_connect": "Unable to connect to ALPR-RU: {error}",
       "cannot_get_camera_image": "Unable to capture an image from the selected camera: {error}"
     },
     "abort": {
