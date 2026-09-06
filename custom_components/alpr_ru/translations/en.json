@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ALPR-RU",
+        "description": "Select any Home Assistant camera. During validation Home Assistant captures one frame locally and sends it to ALPR-RU.",
+        "data": {
+          "api_url": "ALPR-RU API URL",
+          "api_key": "API key",
+          "camera_entity": "Default camera",
+          "plate_type": "Plate type"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key",
+      "cannot_connect": "Unable to connect to ALPR-RU",
+      "cannot_get_camera_image": "Unable to capture an image from the selected camera: {error}"
+    },
+    "abort": {
+      "single_instance_allowed": "ALPR-RU is already configured. Use the alpr_ru.recognize action for other cameras."
+    }
+  },
+  "selector": {
+    "plate_type": {
+      "options": {
+        "auto": "Automatic",
+        "single_line": "Single line",
+        "two_line": "Two line"
+      }
+    }
+  }
+}
