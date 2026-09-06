@@ -9,7 +9,7 @@ CONF_API_KEY = "api_key"
 CONF_CAMERA_ENTITY = "camera_entity"
 CONF_PLATE_TYPE = "plate_type"
 
-DEFAULT_API_URL = "https://alpr.pirogovx.ru/api"
+DEFAULT_API_URL = "https://api-alpr.pirogovx.ru"
 DEFAULT_PLATE_TYPE = "auto"
 PLATE_TYPES = ["auto", "single_line", "two_line"]
 
