@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.components.camera import async_get_image
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_ENTITY_ID
+from homeassistant.const import CONF_ENTITY_ID, STATE_ON
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
 from .api import AlprRuApi, AlprRuError
@@ -23,6 +25,7 @@ from .const import (
     CONF_API_URL,
     CONF_CAMERA_ENTITY,
     CONF_PLATE_TYPE,
+    CONF_TRIGGER_ENTITY,
     DEFAULT_PLATE_TYPE,
     DOMAIN,
     EVENT_PLATE_DETECTED,
@@ -31,6 +34,8 @@ from .const import (
     SERVICE_RECOGNIZE,
     SIGNAL_RESULT,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 SERVICE_SCHEMA = vol.Schema(
     {
@@ -49,7 +54,9 @@ class AlprRuRuntime:
     api: AlprRuApi
     default_camera: str
     default_plate_type: str
+    trigger_entity: str | None = None
     last_result: dict[str, Any] = field(default_factory=dict)
+    trigger_running: bool = False
 
     async def async_recognize(
         self,
@@ -79,6 +86,7 @@ class AlprRuRuntime:
         recognized_at = dt_util.utcnow().isoformat()
         result = dict(result)
         result["camera_entity"] = target_camera
+        result["trigger_entity"] = self.trigger_entity
         result["recognized_at"] = recognized_at
         self.last_result = result
 
@@ -94,6 +102,7 @@ class AlprRuRuntime:
                 EVENT_PLATE_DETECTED,
                 {
                     "camera_entity": target_camera,
+                    "trigger_entity": self.trigger_entity,
                     "plate": plate,
                     "confidence": result.get("confidence"),
                     "valid_format": result.get("valid_format"),
@@ -132,6 +141,11 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     return True
 
 
+async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload ALPR-RU when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up ALPR-RU from a config entry."""
     session = async_get_clientsession(hass)
@@ -141,14 +155,71 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_API_KEY],
     )
 
+    default_camera = entry.options.get(
+        CONF_CAMERA_ENTITY,
+        entry.data[CONF_CAMERA_ENTITY],
+    )
+    default_plate_type = entry.options.get(
+        CONF_PLATE_TYPE,
+        entry.data.get(CONF_PLATE_TYPE, DEFAULT_PLATE_TYPE),
+    )
+    trigger_entity = entry.options.get(
+        CONF_TRIGGER_ENTITY,
+        entry.data.get(CONF_TRIGGER_ENTITY),
+    )
+
     runtime = AlprRuRuntime(
         hass=hass,
         entry=entry,
         api=api,
-        default_camera=entry.data[CONF_CAMERA_ENTITY],
-        default_plate_type=entry.data.get(CONF_PLATE_TYPE, DEFAULT_PLATE_TYPE),
+        default_camera=default_camera,
+        default_plate_type=default_plate_type,
+        trigger_entity=trigger_entity,
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = runtime
+
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+
+    if trigger_entity:
+        async def _async_trigger_changed(event) -> None:
+            """Recognize when the selected binary sensor changes to on."""
+            old_state = event.data.get("old_state")
+            new_state = event.data.get("new_state")
+
+            if new_state is None or new_state.state != STATE_ON:
+                return
+            if old_state is not None and old_state.state == STATE_ON:
+                return
+            if runtime.trigger_running:
+                _LOGGER.debug(
+                    "Ignoring trigger %s because recognition is already running",
+                    trigger_entity,
+                )
+                return
+
+            runtime.trigger_running = True
+            try:
+                _LOGGER.debug(
+                    "Automatic ALPR recognition triggered by %s",
+                    trigger_entity,
+                )
+                await runtime.async_recognize()
+            except HomeAssistantError as err:
+                _LOGGER.warning(
+                    "Automatic ALPR recognition from %s failed: %s",
+                    trigger_entity,
+                    err,
+                )
+            finally:
+                runtime.trigger_running = False
+
+        entry.async_on_unload(
+            async_track_state_change_event(
+                hass,
+                [trigger_entity],
+                _async_trigger_changed,
+            )
+        )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
