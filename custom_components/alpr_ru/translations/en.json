@@ -3,12 +3,16 @@
     "step": {
       "user": {
         "title": "ALPR-RU",
-        "description": "Select any Home Assistant camera. During validation Home Assistant captures one frame locally and sends it to ALPR-RU.",
+        "description": "Select a Home Assistant camera and, optionally, a binary_sensor that will automatically start recognition when it turns on.",
         "data": {
           "api_url": "ALPR-RU API URL",
           "api_key": "API key",
           "camera_entity": "Default camera",
+          "trigger_entity": "Automatic recognition trigger",
           "plate_type": "Plate type"
+        },
+        "data_description": {
+          "trigger_entity": "Optional. For example, Dahua Smart Motion Vehicle. When the sensor changes from off to on, a frame is captured from the selected camera and sent to ALPR-RU."
         }
       }
     },
@@ -18,7 +22,23 @@
       "cannot_get_camera_image": "Unable to capture an image from the selected camera: {error}"
     },
     "abort": {
-      "single_instance_allowed": "ALPR-RU is already configured. Use the alpr_ru.recognize action for other cameras."
+      "single_instance_allowed": "ALPR-RU is already configured. Open Configure to select the camera and automatic trigger."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure ALPR-RU",
+        "description": "Select the camera and an optional binary_sensor for automatic recognition.",
+        "data": {
+          "camera_entity": "Camera",
+          "trigger_entity": "Automatic recognition trigger",
+          "plate_type": "Plate type"
+        },
+        "data_description": {
+          "trigger_entity": "For example, Smart Motion Vehicle. Recognition starts when the sensor changes from off to on. Leave empty for manual recognition only."
+        }
+      }
     }
   },
   "selector": {
