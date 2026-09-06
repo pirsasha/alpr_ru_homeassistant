@@ -7,6 +7,7 @@ DOMAIN = "alpr_ru"
 CONF_API_URL = "api_url"
 CONF_API_KEY = "api_key"
 CONF_CAMERA_ENTITY = "camera_entity"
+CONF_TRIGGER_ENTITY = "trigger_entity"
 CONF_PLATE_TYPE = "plate_type"
 
 DEFAULT_API_URL = "https://api-alpr.pirogovx.ru"
