@@ -12,7 +12,7 @@
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=alpr_ru)
 
-## Возможности v0.1
+## Возможности v0.2
 
 - выбор любой сущности `camera.*` в Home Assistant;
 - получение JPEG штатным Camera API Home Assistant;
@@ -22,20 +22,34 @@
 - сенсор последнего распознанного номера;
 - кнопка «Распознать сейчас»;
 - действие `alpr_ru.recognize` для распознавания с любой другой камеры;
-- событие `alpr_ru_plate_detected` при успешном распознавании.
+- событие `alpr_ru_plate_detected` при успешном распознавании;
+- автоматический запуск от любого `binary_sensor.*`, например Dahua `Smart Motion Vehicle`.
 
 ## Настройка
 
-После установки откройте **Настройки → Устройства и службы → Добавить интеграцию → ALPR-RU**.
+После установки откройте **Настройки → Устройства и службы → ALPR-RU → Настроить**.
 
-Укажите:
+Можно выбрать:
 
-- API URL: `https://api-alpr.pirogovx.ru`
-- API key
-- камеру Home Assistant
-- тип номера
+- камеру Home Assistant;
+- необязательный `binary_sensor.*` как автоматический триггер;
+- тип номера.
 
-При сохранении интеграция получает тестовый кадр с камеры и проверяет запрос к ALPR-RU.
+Если выбран триггер, интеграция слушает переход датчика из `off` в `on`. При срабатывании она автоматически получает текущий кадр с выбранной камеры и отправляет его в ALPR-RU.
+
+Пример для Dahua:
+
+```text
+Smart Motion Vehicle: off -> on
+        ↓
+camera.main -> текущий JPEG
+        ↓
+ALPR-RU
+        ↓
+T868EO761
+```
+
+Важно: если сама интеграция камеры никогда не переводит выбранный `binary_sensor` в `on`, автоматический запрос не произойдёт. В таком случае нужно выбрать другой реально срабатывающий датчик или использовать ручное действие.
 
 ## Действие для любой камеры
 
@@ -60,6 +74,7 @@ alpr_ru_plate_detected
 
 ```yaml
 camera_entity: camera.vorota
+trigger_entity: binary_sensor.smart_motion_vehicle
 plate: T868EO761
 confidence: 0.94
 valid_format: true
@@ -67,6 +82,6 @@ detector_confidence: 0.91
 bbox: [548, 390, 629, 441]
 ```
 
-## Статус
+## Версия
 
-Версия `0.1.1` исправляет адрес публичного API, маскирует API key в форме и показывает подробность ошибки подключения.
+`0.2.0` добавляет выбор `binary_sensor.*` для автоматического распознавания и страницу «Настроить» для уже установленной интеграции.
