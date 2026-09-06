@@ -4,7 +4,7 @@
   "codeowners": ["@pirsasha"],
   "config_flow": true,
   "documentation": "https://github.com/pirsasha/alpr_ru_homeassistant",
-  "iot_class": "cloud_polling",
+  "iot_class": "cloud_push",
   "requirements": [],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
