@@ -12,7 +12,7 @@
           "plate_type": "Plate type"
         },
         "data_description": {
-          "trigger_entity": "Optional. For example, Dahua Smart Motion Vehicle. When the sensor changes from off to on, a frame is captured from the selected camera and sent to ALPR-RU."
+          "trigger_entity": "Optional. When the selected binary_sensor changes from off to on, a frame is captured from the selected camera and sent to ALPR-RU."
         }
       }
     },
@@ -22,21 +22,31 @@
       "cannot_get_camera_image": "Unable to capture an image from the selected camera: {error}"
     },
     "abort": {
-      "single_instance_allowed": "ALPR-RU is already configured. Open Configure to select the camera and automatic trigger."
+      "single_instance_allowed": "ALPR-RU is already configured. Open Configure to change its settings."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Configure ALPR-RU",
-        "description": "Select the camera and an optional binary_sensor for automatic recognition.",
+        "description": "Configure recognition and, optionally, automatic gate opening for whitelisted license plates.",
         "data": {
           "camera_entity": "Camera",
           "trigger_entity": "Automatic recognition trigger",
-          "plate_type": "Plate type"
+          "plate_type": "Plate type",
+          "access_enabled": "Open gate for allowed plates",
+          "allowed_plates": "Allowed license plates",
+          "gate_entity": "Relay / button / gate",
+          "min_confidence": "Minimum confidence for opening",
+          "gate_cooldown": "Delay between openings, sec"
         },
         "data_description": {
-          "trigger_entity": "For example, Smart Motion Vehicle. Recognition starts when the sensor changes from off to on. Leave empty for manual recognition only."
+          "trigger_entity": "Recognition starts only when the selected binary_sensor changes from off to on. Leave empty for manual recognition only.",
+          "access_enabled": "Disabled by default. Enable only after testing recognition and the selected gate entity.",
+          "allowed_plates": "One plate per line or separated by commas/spaces. Cyrillic and Latin characters are normalized automatically.",
+          "gate_entity": "Supports switch.*, button.* and cover.*. switch uses turn_on, button uses press, cover uses open_cover.",
+          "min_confidence": "The plate must be whitelisted, have a valid format and meet this confidence threshold.",
+          "gate_cooldown": "Prevents repeated gate commands during a burst of recognition events."
         }
       }
     }
