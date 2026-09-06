@@ -54,7 +54,8 @@ class AlprRuLastPlateSensor(SensorEntity):
         """Return useful recognition metadata."""
         result = self._runtime.last_result
         return {
-            "camera_entity": result.get("camera_entity"),
+            "camera_entity": result.get("camera_entity") or self._runtime.default_camera,
+            "trigger_entity": self._runtime.trigger_entity,
             "confidence": result.get("confidence"),
             "valid_format": result.get("valid_format"),
             "detector_confidence": result.get("detector_confidence"),
