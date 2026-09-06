@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import logging
+import re
+import time
 from typing import Any
 
 import voluptuous as vol
@@ -21,13 +23,23 @@ from homeassistant.util import dt as dt_util
 
 from .api import AlprRuApi, AlprRuError
 from .const import (
+    CONF_ACCESS_ENABLED,
+    CONF_ALLOWED_PLATES,
     CONF_API_KEY,
     CONF_API_URL,
     CONF_CAMERA_ENTITY,
+    CONF_GATE_COOLDOWN,
+    CONF_GATE_ENTITY,
+    CONF_MIN_CONFIDENCE,
     CONF_PLATE_TYPE,
     CONF_TRIGGER_ENTITY,
+    DEFAULT_ACCESS_ENABLED,
+    DEFAULT_ALLOWED_PLATES,
+    DEFAULT_GATE_COOLDOWN,
+    DEFAULT_MIN_CONFIDENCE,
     DEFAULT_PLATE_TYPE,
     DOMAIN,
+    EVENT_ACCESS_GRANTED,
     EVENT_PLATE_DETECTED,
     PLATE_TYPES,
     PLATFORMS,
@@ -44,6 +56,37 @@ SERVICE_SCHEMA = vol.Schema(
     }
 )
 
+_CYRILLIC_TO_LATIN = str.maketrans(
+    {
+        "А": "A",
+        "В": "B",
+        "Е": "E",
+        "К": "K",
+        "М": "M",
+        "Н": "H",
+        "О": "O",
+        "Р": "P",
+        "С": "C",
+        "Т": "T",
+        "У": "Y",
+        "Х": "X",
+    }
+)
+
+
+def _normalize_plate(value: str) -> str:
+    """Normalize a Russian plate for exact whitelist matching."""
+    return re.sub(r"[^A-Z0-9]", "", value.upper().translate(_CYRILLIC_TO_LATIN))
+
+
+def _parse_allowed_plates(value: str) -> set[str]:
+    """Parse newline/comma/semicolon/space separated plate values."""
+    return {
+        normalized
+        for item in re.split(r"[\s,;]+", value or "")
+        if (normalized := _normalize_plate(item))
+    }
+
 
 @dataclass(slots=True)
 class AlprRuRuntime:
@@ -55,6 +98,12 @@ class AlprRuRuntime:
     default_camera: str
     default_plate_type: str
     trigger_entity: str | None = None
+    access_enabled: bool = False
+    allowed_plates: set[str] = field(default_factory=set)
+    gate_entity: str | None = None
+    min_confidence: float = DEFAULT_MIN_CONFIDENCE
+    gate_cooldown: float = DEFAULT_GATE_COOLDOWN
+    last_gate_open_monotonic: float = 0.0
     last_result: dict[str, Any] = field(default_factory=dict)
     trigger_running: bool = False
     last_submitted_image: bytes | None = None
@@ -79,13 +128,9 @@ class AlprRuRuntime:
                 f"Не удалось получить кадр с {target_camera}: {err}"
             ) from err
 
-        # Keep exactly the bytes that are sent to ALPR-RU. This is in-memory
-        # only; no snapshot file is written to /config.
         self.last_submitted_image = image.content
         self.last_submitted_content_type = image.content_type
 
-        # Refresh the submitted-frame camera immediately. This lets the user
-        # inspect the captured frame even if the subsequent cloud request fails.
         async_dispatcher_send(
             self.hass,
             SIGNAL_RESULT.format(entry_id=self.entry.entry_id),
@@ -106,10 +151,7 @@ class AlprRuRuntime:
         result["camera_entity"] = target_camera
         result["trigger_entity"] = self.trigger_entity
         result["recognized_at"] = recognized_at
-        self.last_result = result
 
-        # The public API can return relative debug URLs. Prefer the rectified
-        # plate crop because it is the closest representation of what OCR saw.
         debug = result.get("debug")
         result_image_url: str | None = None
         if isinstance(debug, dict):
@@ -123,17 +165,21 @@ class AlprRuRuntime:
         self.last_result_image_url = (
             str(result_image_url) if result_image_url else None
         )
-        # Invalidate the lazy cache for the new recognition result.
         self.last_result_image = None
         self.last_result_content_type = None
 
+        plate = str(result.get("plate") or "").strip()
+        normalized_plate = _normalize_plate(plate) if plate else ""
+        if result.get("ok") and normalized_plate:
+            await self._async_handle_access(result, normalized_plate, recognized_at)
+
+        self.last_result = result
         async_dispatcher_send(
             self.hass,
             SIGNAL_RESULT.format(entry_id=self.entry.entry_id),
             result,
         )
 
-        plate = str(result.get("plate") or "").strip()
         if result.get("ok") and plate:
             self.hass.bus.async_fire(
                 EVENT_PLATE_DETECTED,
@@ -145,11 +191,94 @@ class AlprRuRuntime:
                     "valid_format": result.get("valid_format"),
                     "detector_confidence": result.get("detector_confidence"),
                     "bbox": result.get("bbox"),
+                    "access_allowed": result.get("access_allowed", False),
+                    "access_reason": result.get("access_reason"),
+                    "gate_entity": self.gate_entity,
                     "recognized_at": recognized_at,
                 },
             )
 
         return result
+
+    async def _async_handle_access(
+        self,
+        result: dict[str, Any],
+        normalized_plate: str,
+        recognized_at: str,
+    ) -> None:
+        """Open the configured HA gate entity for an allowed plate."""
+        result["access_allowed"] = False
+        result["gate_entity"] = self.gate_entity
+
+        if not self.access_enabled:
+            result["access_reason"] = "disabled"
+            return
+        if normalized_plate not in self.allowed_plates:
+            result["access_reason"] = "not_whitelisted"
+            return
+        if result.get("valid_format") is not True:
+            result["access_reason"] = "invalid_plate_format"
+            return
+
+        try:
+            confidence = float(result.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if confidence < self.min_confidence:
+            result["access_reason"] = "low_confidence"
+            return
+        if not self.gate_entity or "." not in self.gate_entity:
+            result["access_reason"] = "gate_not_configured"
+            return
+
+        now = time.monotonic()
+        if (
+            self.gate_cooldown > 0
+            and self.last_gate_open_monotonic > 0
+            and now - self.last_gate_open_monotonic < self.gate_cooldown
+        ):
+            result["access_reason"] = "cooldown"
+            return
+
+        domain = self.gate_entity.split(".", 1)[0]
+        service = {
+            "switch": "turn_on",
+            "button": "press",
+            "cover": "open_cover",
+        }.get(domain)
+        if service is None:
+            result["access_reason"] = "unsupported_gate_entity"
+            return
+
+        try:
+            await self.hass.services.async_call(
+                domain,
+                service,
+                {CONF_ENTITY_ID: self.gate_entity},
+                blocking=True,
+            )
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to open %s for %s: %s",
+                self.gate_entity,
+                normalized_plate,
+                err,
+            )
+            result["access_reason"] = "service_error"
+            return
+
+        self.last_gate_open_monotonic = now
+        result["access_allowed"] = True
+        result["access_reason"] = "opened"
+        self.hass.bus.async_fire(
+            EVENT_ACCESS_GRANTED,
+            {
+                "plate": normalized_plate,
+                "confidence": confidence,
+                "gate_entity": self.gate_entity,
+                "recognized_at": recognized_at,
+            },
+        )
 
     async def async_get_result_image(self) -> bytes | None:
         """Return the cached ALPR result crop, fetching it once if required."""
@@ -223,6 +352,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         CONF_TRIGGER_ENTITY,
         entry.data.get(CONF_TRIGGER_ENTITY),
     )
+    access_enabled = bool(
+        entry.options.get(CONF_ACCESS_ENABLED, DEFAULT_ACCESS_ENABLED)
+    )
+    allowed_plates = _parse_allowed_plates(
+        str(entry.options.get(CONF_ALLOWED_PLATES, DEFAULT_ALLOWED_PLATES) or "")
+    )
+    gate_entity = entry.options.get(CONF_GATE_ENTITY)
+    min_confidence = float(
+        entry.options.get(CONF_MIN_CONFIDENCE, DEFAULT_MIN_CONFIDENCE)
+    )
+    gate_cooldown = float(
+        entry.options.get(CONF_GATE_COOLDOWN, DEFAULT_GATE_COOLDOWN)
+    )
 
     runtime = AlprRuRuntime(
         hass=hass,
@@ -231,12 +373,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         default_camera=default_camera,
         default_plate_type=default_plate_type,
         trigger_entity=trigger_entity,
+        access_enabled=access_enabled,
+        allowed_plates=allowed_plates,
+        gate_entity=gate_entity,
+        min_confidence=min_confidence,
+        gate_cooldown=gate_cooldown,
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = runtime
 
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 
     if trigger_entity:
+
         async def _async_run_automatic_recognition() -> None:
             """Run one automatic recognition and contain failures."""
             try:
