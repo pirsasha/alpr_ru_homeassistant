@@ -57,6 +57,11 @@ class AlprRuRuntime:
     trigger_entity: str | None = None
     last_result: dict[str, Any] = field(default_factory=dict)
     trigger_running: bool = False
+    last_submitted_image: bytes | None = None
+    last_submitted_content_type: str | None = None
+    last_result_image_url: str | None = None
+    last_result_image: bytes | None = None
+    last_result_content_type: str | None = None
 
     async def async_recognize(
         self,
@@ -74,6 +79,11 @@ class AlprRuRuntime:
                 f"Не удалось получить кадр с {target_camera}: {err}"
             ) from err
 
+        # Keep exactly the bytes that are sent to ALPR-RU. This is in-memory
+        # only; no snapshot file is written to /config.
+        self.last_submitted_image = image.content
+        self.last_submitted_content_type = image.content_type
+
         try:
             result = await self.api.async_recognize(
                 image.content,
@@ -89,6 +99,25 @@ class AlprRuRuntime:
         result["trigger_entity"] = self.trigger_entity
         result["recognized_at"] = recognized_at
         self.last_result = result
+
+        # The public API can return relative debug URLs. Prefer the rectified
+        # plate crop because it is the closest representation of what OCR saw.
+        debug = result.get("debug")
+        result_image_url: str | None = None
+        if isinstance(debug, dict):
+            result_image_url = (
+                debug.get("rectified_crop_url")
+                or debug.get("crop_url")
+                or debug.get("top_crop_url")
+                or debug.get("bottom_crop_url")
+            )
+
+        self.last_result_image_url = (
+            str(result_image_url) if result_image_url else None
+        )
+        # Invalidate the lazy cache for the new recognition result.
+        self.last_result_image = None
+        self.last_result_content_type = None
 
         async_dispatcher_send(
             self.hass,
@@ -113,6 +142,25 @@ class AlprRuRuntime:
             )
 
         return result
+
+    async def async_get_result_image(self) -> bytes | None:
+        """Return the cached ALPR result crop, fetching it once if required."""
+        if self.last_result_image is not None:
+            return self.last_result_image
+        if not self.last_result_image_url:
+            return None
+
+        try:
+            data, content_type = await self.api.async_get_debug_image(
+                self.last_result_image_url
+            )
+        except AlprRuError as err:
+            _LOGGER.warning("Unable to load ALPR result image: %s", err)
+            return None
+
+        self.last_result_image = data
+        self.last_result_content_type = content_type
+        return data
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
