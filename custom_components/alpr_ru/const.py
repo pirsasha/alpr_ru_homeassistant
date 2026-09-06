@@ -3,7 +3,7 @@
 from homeassistant.const import Platform
 
 DOMAIN = "alpr_ru"
-INTEGRATION_VERSION = "0.4.1"
+INTEGRATION_VERSION = "0.4.2"
 
 CONF_API_URL = "api_url"
 CONF_API_KEY = "api_key"
