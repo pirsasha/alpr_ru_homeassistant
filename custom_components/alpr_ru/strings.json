@@ -14,7 +14,7 @@
     },
     "error": {
       "invalid_auth": "Неверный API key",
-      "cannot_connect": "Не удалось подключиться к ALPR-RU",
+      "cannot_connect": "Не удалось подключиться к ALPR-RU: {error}",
       "cannot_get_camera_image": "Не удалось получить кадр с выбранной камеры: {error}"
     },
     "abort": {
