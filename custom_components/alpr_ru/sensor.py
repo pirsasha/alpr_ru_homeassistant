@@ -12,7 +12,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import AlprRuRuntime
-from .const import DOMAIN, SIGNAL_RESULT
+from .const import DOMAIN, INTEGRATION_VERSION, SIGNAL_RESULT
 
 
 async def async_setup_entry(
@@ -40,6 +40,7 @@ class AlprRuLastPlateSensor(SensorEntity):
             name="ALPR-RU",
             manufacturer="PirogovX",
             model="Cloud ALPR",
+            sw_version=INTEGRATION_VERSION,
         )
         self._unsub_dispatcher = None
 
@@ -64,6 +65,11 @@ class AlprRuLastPlateSensor(SensorEntity):
             "recognized_at": result.get("recognized_at"),
             "result_image_available": self._runtime.last_result_image_url is not None,
             "result_image_url": self._runtime.last_result_image_url,
+            "access_enabled": self._runtime.access_enabled,
+            "access_allowed": result.get("access_allowed"),
+            "access_reason": result.get("access_reason"),
+            "gate_entity": self._runtime.gate_entity,
+            "allowed_plates_count": len(self._runtime.allowed_plates),
             "error": result.get("error"),
             "mode": result.get("mode"),
         }
