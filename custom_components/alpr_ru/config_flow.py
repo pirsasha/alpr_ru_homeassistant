@@ -27,6 +27,13 @@ from .const import (
 )
 
 
+def _camera_key(values: dict[str, Any]) -> vol.Required:
+    current = values.get(CONF_CAMERA_ENTITY)
+    if current:
+        return vol.Required(CONF_CAMERA_ENTITY, default=current)
+    return vol.Required(CONF_CAMERA_ENTITY)
+
+
 def _trigger_key(values: dict[str, Any]) -> vol.Optional:
     current = values.get(CONF_TRIGGER_ENTITY)
     if current:
@@ -45,10 +52,7 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
             vol.Required(CONF_API_KEY): selector.TextSelector(
                 selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
             ),
-            vol.Required(
-                CONF_CAMERA_ENTITY,
-                default=values.get(CONF_CAMERA_ENTITY),
-            ): selector.EntitySelector(
+            _camera_key(values): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="camera")
             ),
             _trigger_key(values): selector.EntitySelector(
@@ -71,10 +75,7 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
 def _options_schema(values: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
-            vol.Required(
-                CONF_CAMERA_ENTITY,
-                default=values.get(CONF_CAMERA_ENTITY),
-            ): selector.EntitySelector(
+            _camera_key(values): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="camera")
             ),
             _trigger_key(values): selector.EntitySelector(
