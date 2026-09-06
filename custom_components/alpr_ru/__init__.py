@@ -11,7 +11,7 @@ import voluptuous as vol
 from homeassistant.components.camera import async_get_image
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITY_ID, STATE_ON
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -181,23 +181,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 
     if trigger_entity:
-        async def _async_trigger_changed(event) -> None:
-            """Recognize when the selected binary sensor changes to on."""
-            old_state = event.data.get("old_state")
-            new_state = event.data.get("new_state")
-
-            if new_state is None or new_state.state != STATE_ON:
-                return
-            if old_state is not None and old_state.state == STATE_ON:
-                return
-            if runtime.trigger_running:
-                _LOGGER.debug(
-                    "Ignoring trigger %s because recognition is already running",
-                    trigger_entity,
-                )
-                return
-
-            runtime.trigger_running = True
+        async def _async_run_automatic_recognition() -> None:
+            """Run one automatic recognition and contain failures."""
             try:
                 _LOGGER.debug(
                     "Automatic ALPR recognition triggered by %s",
@@ -213,11 +198,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             finally:
                 runtime.trigger_running = False
 
+        @callback
+        def _trigger_changed(event) -> None:
+            """Schedule recognition when the selected binary sensor turns on."""
+            old_state = event.data.get("old_state")
+            new_state = event.data.get("new_state")
+
+            if new_state is None or new_state.state != STATE_ON:
+                return
+            if old_state is not None and old_state.state == STATE_ON:
+                return
+            if runtime.trigger_running:
+                _LOGGER.debug(
+                    "Ignoring trigger %s because recognition is already running",
+                    trigger_entity,
+                )
+                return
+
+            runtime.trigger_running = True
+            hass.async_create_task(_async_run_automatic_recognition())
+
         entry.async_on_unload(
             async_track_state_change_event(
                 hass,
                 [trigger_entity],
-                _async_trigger_changed,
+                _trigger_changed,
             )
         )
 
