@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ALPR-RU",
+        "description": "Выберите любую камеру Home Assistant. Во время проверки Home Assistant получит один кадр локально и отправит его на ALPR-RU.",
+        "data": {
+          "api_url": "ALPR-RU API URL",
+          "api_key": "API key",
+          "camera_entity": "Камера по умолчанию",
+          "plate_type": "Тип номера"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Неверный API key",
+      "cannot_connect": "Не удалось подключиться к ALPR-RU",
+      "cannot_get_camera_image": "Не удалось получить кадр с выбранной камеры: {error}"
+    },
+    "abort": {
+      "single_instance_allowed": "ALPR-RU уже настроен. Для другой камеры используйте действие alpr_ru.recognize."
+    }
+  },
+  "selector": {
+    "plate_type": {
+      "options": {
+        "auto": "Автоматически",
+        "single_line": "Однострочный",
+        "two_line": "Двухстрочный"
+      }
+    }
+  }
+}
