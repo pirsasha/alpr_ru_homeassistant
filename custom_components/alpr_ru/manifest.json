@@ -1,0 +1,10 @@
+{
+  "domain": "alpr_ru",
+  "name": "ALPR-RU",
+  "codeowners": ["@pirsasha"],
+  "config_flow": true,
+  "documentation": "https://github.com/pirsasha/alpr_ru_homeassistant",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}
