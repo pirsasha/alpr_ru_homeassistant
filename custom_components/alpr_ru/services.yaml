@@ -1,0 +1,22 @@
+recognize:
+  name: Распознать номер
+  description: Получает текущий кадр из любой camera.* в Home Assistant и отправляет его в ALPR-RU.
+  fields:
+    entity_id:
+      name: Камера
+      description: Камера Home Assistant, из которой нужно получить текущий кадр.
+      required: true
+      selector:
+        entity:
+          domain: camera
+    plate_type:
+      name: Тип номера
+      description: Автоматическое, однострочное или двухстрочное распознавание.
+      required: false
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - single_line
+            - two_line
