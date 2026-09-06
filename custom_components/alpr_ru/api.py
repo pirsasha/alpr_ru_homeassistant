@@ -68,7 +68,9 @@ class AlprRuApi:
         )
         form.add_field("plate_type", plate_type)
         form.add_field("use_rectifier", "true")
-        form.add_field("include_debug_urls", "false")
+        # URLs themselves add no extra request. The result camera downloads the
+        # selected crop lazily only when Home Assistant asks to display it.
+        form.add_field("include_debug_urls", "true")
 
         headers = {"X-API-Key": self._api_key}
 
@@ -90,6 +92,28 @@ class AlprRuApi:
                         data.get("error") or f"HTTP {response.status}"
                     )
                 return data
+        except AlprRuError:
+            raise
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise AlprRuConnectionError(str(err)) from err
+
+    async def async_get_debug_image(
+        self,
+        image_url: str,
+    ) -> tuple[bytes, str | None]:
+        """Download one ALPR debug image lazily for the HA result camera."""
+        headers = {"X-API-Key": self._api_key}
+        try:
+            async with self._session.get(
+                self._url(image_url),
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as response:
+                if response.status in (401, 403):
+                    raise AlprRuAuthError("Invalid ALPR-RU API key")
+                if response.status >= 400:
+                    raise AlprRuConnectionError(f"HTTP {response.status}")
+                return await response.read(), response.content_type
         except AlprRuError:
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
