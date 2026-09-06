@@ -3,12 +3,16 @@
     "step": {
       "user": {
         "title": "ALPR-RU",
-        "description": "Выберите любую камеру Home Assistant. Во время проверки Home Assistant получит один кадр локально и отправит его на ALPR-RU.",
+        "description": "Выберите камеру Home Assistant и при необходимости binary_sensor, который будет автоматически запускать распознавание при переходе в состояние Вкл.",
         "data": {
           "api_url": "ALPR-RU API URL",
           "api_key": "API key",
           "camera_entity": "Камера по умолчанию",
+          "trigger_entity": "Триггер автоматического распознавания",
           "plate_type": "Тип номера"
+        },
+        "data_description": {
+          "trigger_entity": "Необязательно. Например, Dahua Smart Motion Vehicle. При переходе датчика из Выкл в Вкл будет получен кадр с выбранной камеры и отправлен в ALPR-RU."
         }
       }
     },
@@ -18,7 +22,23 @@
       "cannot_get_camera_image": "Не удалось получить кадр с выбранной камеры: {error}"
     },
     "abort": {
-      "single_instance_allowed": "ALPR-RU уже настроен. Для другой камеры используйте действие alpr_ru.recognize."
+      "single_instance_allowed": "ALPR-RU уже настроен. Откройте Настроить для выбора камеры и автоматического триггера."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройка ALPR-RU",
+        "description": "Выберите камеру и необязательный binary_sensor для автоматического распознавания.",
+        "data": {
+          "camera_entity": "Камера",
+          "trigger_entity": "Триггер автоматического распознавания",
+          "plate_type": "Тип номера"
+        },
+        "data_description": {
+          "trigger_entity": "Например, Smart Motion Vehicle. Распознавание запускается при переходе датчика из Выкл в Вкл. Оставьте пустым для ручного запуска."
+        }
+      }
     }
   },
   "selector": {
