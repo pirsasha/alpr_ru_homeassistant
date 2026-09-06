@@ -12,7 +12,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import AlprRuRuntime
-from .const import DOMAIN, SIGNAL_RESULT
+from .const import DOMAIN, INTEGRATION_VERSION, SIGNAL_RESULT
 
 
 async def async_setup_entry(
@@ -44,6 +44,7 @@ class AlprRuImageCamera(Camera):
             name="ALPR-RU",
             manufacturer="PirogovX",
             model="Cloud ALPR",
+            sw_version=INTEGRATION_VERSION,
         )
         self._unsub_dispatcher = None
 
