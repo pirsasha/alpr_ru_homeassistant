@@ -9,7 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import AlprRuRuntime
-from .const import DOMAIN
+from .const import DOMAIN, INTEGRATION_VERSION
 
 
 async def async_setup_entry(
@@ -37,6 +37,7 @@ class AlprRuRecognizeButton(ButtonEntity):
             name="ALPR-RU",
             manufacturer="PirogovX",
             model="Cloud ALPR",
+            sw_version=INTEGRATION_VERSION,
         )
 
     async def async_press(self) -> None:
