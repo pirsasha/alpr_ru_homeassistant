@@ -62,6 +62,8 @@ class AlprRuLastPlateSensor(SensorEntity):
             "bbox": result.get("bbox"),
             "rectified": result.get("rectified"),
             "recognized_at": result.get("recognized_at"),
+            "result_image_available": self._runtime.last_result_image_url is not None,
+            "result_image_url": self._runtime.last_result_image_url,
             "error": result.get("error"),
             "mode": result.get("mode"),
         }
