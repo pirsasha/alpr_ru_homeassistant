@@ -19,4 +19,4 @@ EVENT_PLATE_DETECTED = "alpr_ru_plate_detected"
 
 SIGNAL_RESULT = f"{DOMAIN}_result_{{entry_id}}"
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON, Platform.CAMERA]
