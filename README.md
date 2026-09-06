@@ -16,7 +16,7 @@
 
 - выбор любой сущности `camera.*` в Home Assistant;
 - получение JPEG штатным Camera API Home Assistant;
-- отправка кадра на `https://alpr.pirogovx.ru/api/v1/recognize`;
+- отправка кадра на `https://api-alpr.pirogovx.ru/v1/recognize`;
 - авторизация через API key;
 - режимы `auto`, `single_line`, `two_line`;
 - сенсор последнего распознанного номера;
@@ -30,7 +30,7 @@
 
 Укажите:
 
-- API URL: `https://alpr.pirogovx.ru/api`
+- API URL: `https://api-alpr.pirogovx.ru`
 - API key
 - камеру Home Assistant
 - тип номера
@@ -69,4 +69,4 @@ bbox: [548, 390, 629, 441]
 
 ## Статус
 
-Версия `0.1.0` предназначена для первого полевого тестирования на разных интеграциях камер Home Assistant.
+Версия `0.1.1` исправляет адрес публичного API, маскирует API key в форме и показывает подробность ошибки подключения.
