@@ -33,7 +33,9 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_API_URL,
                 default=values.get(CONF_API_URL, DEFAULT_API_URL),
             ): str,
-            vol.Required(CONF_API_KEY, default=values.get(CONF_API_KEY, "")): str,
+            vol.Required(CONF_API_KEY): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
             vol.Required(CONF_CAMERA_ENTITY): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="camera")
             ),
@@ -82,11 +84,12 @@ class AlprRuConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             except AlprRuAuthError:
                 errors["base"] = "invalid_auth"
-            except AlprRuConnectionError:
+            except AlprRuConnectionError as err:
                 errors["base"] = "cannot_connect"
+                description_placeholders["error"] = str(err)[:200]
             except Exception as err:
                 errors["base"] = "cannot_get_camera_image"
-                description_placeholders["error"] = str(err)[:160]
+                description_placeholders["error"] = str(err)[:200]
             else:
                 user_input[CONF_API_URL] = api_url
                 user_input[CONF_API_KEY] = api_key
