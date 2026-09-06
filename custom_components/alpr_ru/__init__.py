@@ -84,6 +84,14 @@ class AlprRuRuntime:
         self.last_submitted_image = image.content
         self.last_submitted_content_type = image.content_type
 
+        # Refresh the submitted-frame camera immediately. This lets the user
+        # inspect the captured frame even if the subsequent cloud request fails.
+        async_dispatcher_send(
+            self.hass,
+            SIGNAL_RESULT.format(entry_id=self.entry.entry_id),
+            self.last_result,
+        )
+
         try:
             result = await self.api.async_recognize(
                 image.content,
